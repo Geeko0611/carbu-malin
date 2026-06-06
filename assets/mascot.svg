@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-label="Mascotte Carbu-Malin">
+  <rect x="205" y="42" width="58" height="122" rx="12" fill="#0f766e"/>
+  <rect x="217" y="57" width="34" height="30" rx="5" fill="#eafff6"/>
+  <path d="M263 91c28 9 30 29 16 56" fill="none" stroke="#152421" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="280" cy="151" r="9" fill="#152421"/>
+  <path d="M57 137c13-39 49-63 96-56 43 7 70 38 64 76-6 36-43 54-91 50-47-4-82-31-69-70z" fill="#63df58" stroke="#152421" stroke-width="7"/>
+  <path d="M98 82c-31-12-61 0-75 20 27 6 53 3 77-11z" fill="#63df58" stroke="#152421" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M31 104c16 4 39 2 61-9" fill="none" stroke="#152421" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="105" cy="85" r="16" fill="#f5fff1" stroke="#152421" stroke-width="5"/>
+  <circle cx="153" cy="86" r="18" fill="#f5fff1" stroke="#152421" stroke-width="5"/>
+  <circle cx="109" cy="88" r="6" fill="#152421"/>
+  <circle cx="157" cy="90" r="7" fill="#152421"/>
+  <path d="M91 125c25 19 66 17 88-6" fill="none" stroke="#152421" stroke-width="7" stroke-linecap="round"/>
+  <path d="M96 148c18 7 49 5 70-4" fill="none" stroke="#fff6b9" stroke-width="10" stroke-linecap="round"/>
+  <path d="M66 160c-18 2-34 14-37 31 24 3 43-5 56-23z" fill="#3abd54" stroke="#152421" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M196 156c20 3 35 17 38 34-24 3-42-6-53-25z" fill="#3abd54" stroke="#152421" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M193 130c21-8 38-7 51 5" fill="none" stroke="#152421" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="252" cy="136" r="16" fill="#f5b82e" stroke="#152421" stroke-width="5"/>
+  <path d="M245 136h14m-7-7v14" stroke="#152421" stroke-width="4" stroke-linecap="round"/>
+  <g transform="translate(128 168)">
+    <rect x="0" y="15" width="76" height="25" rx="12" fill="#ffffff" stroke="#152421" stroke-width="5"/>
+    <path d="M14 16 25 3h31l13 13" fill="#8ee6a2" stroke="#152421" stroke-width="5" stroke-linejoin="round"/>
+    <circle cx="20" cy="41" r="7" fill="#152421"/>
+    <circle cx="58" cy="41" r="7" fill="#152421"/>
+  </g>
+</svg>

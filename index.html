@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Carbu-malin - Le plein d'€conomies !</title>
+    <meta
+      name="description"
+      content="Carbu-Malin compare les stations-service en France pour trouver où faire son plein de gazole ou SP95-E10 au meilleur coût selon sa voiture."
+    />
+    <meta
+      name="keywords"
+      content="prix carburant, station essence, gazole, diesel, SP95, E10, plein moins cher, carte carburant, comparateur carburant"
+    />
+    <meta name="robots" content="index, follow" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="bingbot" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#0F6D66" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Carbu-Malin" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="canonical" href="https://www.carbu-malin.fr/" />
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+    <link rel="manifest" href="site.webmanifest" />
+    <meta property="og:site_name" content="Carbu-Malin" />
+    <meta property="og:title" content="Carbu-Malin - Où faire mon plein ?" />
+    <meta
+      property="og:description"
+      content="Compare les prix des stations-service et estime le coût réel du plein selon ta voiture."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.carbu-malin.fr/" />
+    <meta property="og:image" content="https://www.carbu-malin.fr/assets/logo.png" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script defer src="assets/vendor/leaflet/leaflet.js"></script>
+    <script defer src="assets/app.js"></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Carbu-Malin",
+        "url": "https://www.carbu-malin.fr/",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Web",
+        "description": "Outil d'aide à la décision pour trouver la station-service la plus économique selon sa voiture."
+      }
+    </script>
+  </head>
+  <body>
+    <section class="auth-screen auth-gate auth-minimal" id="authScreen">
+      <div class="login-strip home-login-strip">
+        <div class="auth-brand">
+          <img class="brand-full-logo header-logo-full" src="assets/brand-full-logo-clean.png" alt="Carbu-Malin - Le plein d'€conomies !" />
+        </div>
+        <div class="header-install-actions" aria-label="Installer Carbu-Malin sur mobile">
+          <button class="icon-button install-icon-button" id="installIosButton" type="button" aria-label="Installer sur iPhone">
+            <span class="platform-icons" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M16.4 12.8c0-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.2-1.7-1.4-.1-2.6.8-3.3.8-.7 0-1.8-.8-2.9-.8-1.5 0-2.9.9-3.7 2.2-1.6 2.8-.4 7 1.1 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.8 3-.8s1.8.8 3.1.8c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.7 0-.1-2.5-1-2.5-3.7ZM14.2 6.2c.6-.8 1.1-1.8 1-2.8-1 .1-2 .7-2.7 1.5-.6.7-1.1 1.7-1 2.7 1 .1 2-.5 2.7-1.4Z"/></svg>
+            </span>
+          </button>
+          <button class="icon-button install-icon-button" id="installShortcutButton" type="button" aria-label="Installer sur Android">
+            <span class="platform-icons" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7.2 9.8h9.6v7.8c0 .7-.6 1.3-1.3 1.3h-.8v2.2c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-2.2h-1.8v2.2c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-2.2h-.8c-.7 0-1.3-.6-1.3-1.3V9.8Zm-2.3.2c.5 0 .9.4.9.9v4.2c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-4.2c0-.5.4-.9.9-.9Zm14.2 0c.5 0 .9.4.9.9v4.2c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-4.2c0-.5.4-.9.9-.9ZM8.1 8.3c.2-1.2.9-2.2 1.8-2.8L9.1 4.2c-.1-.2 0-.5.2-.6.2-.1.5 0 .6.2l.9 1.4c.4-.1.8-.2 1.2-.2s.8.1 1.2.2l.9-1.4c.1-.2.4-.3.6-.2.2.1.3.4.2.6l-.8 1.3c.9.6 1.6 1.6 1.8 2.8H8.1Zm2.3-1.1c.3 0 .5-.2.5-.5s-.2-.5-.5-.5-.5.2-.5.5.2.5.5.5Zm3.2 0c.3 0 .5-.2.5-.5s-.2-.5-.5-.5-.5.2-.5.5.2.5.5.5Z"/></svg>
+            </span>
+          </button>
+        </div>
+        <form id="loginForm" class="auth-form inline-auth-form">
+          <label class="field">
+            <input id="loginEmail" type="text" autocomplete="username" placeholder="Email ou identifiant" required />
+          </label>
+          <label class="field">
+            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Mot de passe" required />
+          </label>
+          <button class="icon-button login-icon-submit" type="submit" aria-label="Se connecter">
+            <img src="assets/icon-login.png" alt="" />
+          </button>
+        </form>
+      </div>
+      <p class="status-line auth-minimal-status" id="authStatus"></p>
+
+      <div class="auth-minimal-signup" id="signupPanel">
+        <button class="auth-minimal-signup-toggle" id="showManualAccount" type="button">Créer un compte</button>
+        <form id="createAccountForm" class="auth-minimal-create-form" hidden>
+          <label class="field">
+            <input id="createEmail" type="email" autocomplete="email" placeholder="Email" required />
+          </label>
+          <label class="field">
+            <input id="createPassword" type="password" autocomplete="new-password" placeholder="Mot de passe (8 car. min)" required minlength="8" />
+          </label>
+          <label class="field">
+            <input id="createPasswordConfirm" type="password" autocomplete="new-password" placeholder="Confirmer le mot de passe" required minlength="8" />
+          </label>
+          <div class="password-strength" aria-live="polite">
+            <div class="strength-track"><span id="passwordStrengthFill"></span></div>
+            <small id="passwordStrengthText">8 caractères, majuscule, minuscule, chiffre et symbole.</small>
+          </div>
+          <label class="check-field consent-field">
+            <input id="createConsent" type="checkbox" required checked />
+            <span>J'accepte que mes données d'usage soient utilisées pour améliorer Carbu-Malin.</span>
+          </label>
+          <button class="button accent-button wide" type="submit">Demander mon accès</button>
+        </form>
+      </div>
+
+      <!-- éléments fantômes requis par app.js -->
+      <span id="installShortcutHint" hidden></span>
+      <form id="landingSearchForm" hidden>
+        <input id="landingSearchInput" hidden />
+        <datalist id="landingSearchSuggestions"></datalist>
+      </form>
+    </section>
+
+    <div id="appShell">
+      <header class="app-header">
+        <div class="brand-block brand-home" id="homeButton" role="button" tabindex="0">
+          <img class="brand-full-logo app-logo-full" src="assets/brand-full-logo-clean.png" alt="Carbu-Malin - Le plein d'€conomies !" />
+          <span id="dataStatus">Chargement des données...</span>
+        </div>
+        <div class="user-actions">
+          <span class="user-chip" id="currentUserLabel"></span>
+          <button class="icon-button header-icon" id="openStats" type="button" aria-label="Statistiques">
+            <span class="button-icon tab-icon-bars" aria-hidden="true"></span>
+          </button>
+          <button class="icon-button header-icon" id="openSettings" type="button" aria-label="Paramètres">
+            <img class="header-action-img" src="assets/icon-settings.png" alt="" />
+          </button>
+          <button class="icon-button header-icon logout-icon" id="logoutButton" type="button" aria-label="Se déconnecter" hidden>
+            <img class="header-action-img" src="assets/icon-logout.png" alt="" />
+          </button>
+        </div>
+      </header>
+
+      <nav class="tabs stats-tabs" aria-label="Statistiques Carbu-Malin">
+        <button class="tab-button home-tab icon-only-tab" type="button" data-back-home aria-label="Retour au plein">
+          <span class="button-icon back-arrow-icon" aria-hidden="true"></span>
+        </button>
+        <button class="tab-button" type="button" data-tab="map">
+          <span class="button-icon tab-icon-map" aria-hidden="true"></span>
+          <span>Carte France</span>
+        </button>
+        <button class="tab-button" type="button" data-tab="dashboard">
+          <span class="button-icon tab-icon-trophy" aria-hidden="true"></span>
+          <span>Classements</span>
+        </button>
+        <button class="tab-button" type="button" data-tab="graphs">
+          <span class="button-icon tab-icon-percent" aria-hidden="true">%</span>
+          <span>Suivi des prix</span>
+        </button>
+      </nav>
+
+      <main class="app-main">
+        <section class="tab-panel active" id="tab-decision" aria-labelledby="Où faire mon plein">
+          <div class="decision-grid">
+            <section class="surface control-surface">
+              <div class="mode-switch" role="group" aria-label="Type d'analyse">
+                <button class="mode-chip active" type="button" data-analysis-mode="local">Autour de moi</button>
+                <button class="mode-chip" type="button" data-analysis-mode="route">Sur un trajet</button>
+              </div>
+              <div class="decision-price-view">
+                <span>Afficher le prix :</span>
+                <div class="segmented-control compact-segmented" role="group" aria-label="Prix affiché dans les résultats">
+                  <button class="mode-chip" type="button" data-price-view="fill">Carburant seul</button>
+                  <button class="mode-chip active" type="button" data-price-view="vehicle">Avec coût du trajet</button>
+                </div>
+              </div>
+
+              <label class="field">
+                <span>Voiture</span>
+                <div class="vehicle-select-row">
+                  <select id="vehicleSelect"></select>
+                  <button class="icon-button edit-vehicle-shortcut" id="editVehiclesShortcut" type="button" aria-label="Modifier mes véhicules"><img src="assets/icon-pencil-transparent.png" alt="" /></button>
+                </div>
+                <small class="vehicle-select-meta" id="vehicleMeta"></small>
+              </label>
+              <hr class="form-divider" />
+
+              <label class="field">
+                <span>Jauge actuelle du véhicule</span>
+                <div class="fuel-gauge-control">
+                  <div
+                    class="fuel-gauge-visual"
+                    id="fuelGaugeVisual"
+                    role="slider"
+                    tabindex="0"
+                    aria-label="Jauge actuelle du véhicule"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="30"
+                  >
+                    <div class="fuel-gauge-tiles" id="fuelGaugeTiles"></div>
+                  </div>
+                  <div class="fuel-gauge-labels" aria-hidden="true">
+                    <span style="left:10%">Réserve</span>
+                    <span style="left:25%">1/4</span>
+                    <span style="left:50%">1/2</span>
+                    <span style="left:75%">3/4</span>
+                  </div>
+                  <input id="gaugeInput" type="hidden" value="30" />
+                  <output id="gaugeOutput" for="gaugeInput">30%</output>
+                </div>
+              </label>
+              <hr class="form-divider" />
+
+              <label class="field">
+                <span>Adresse de départ :</span>
+                <div class="inline-input-action">
+                  <input id="cityInput" type="search" placeholder="Ex. 12 rue de Paris, Rambouillet" autocomplete="off" list="citySuggestions" />
+                  <datalist id="citySuggestions"></datalist>
+                  <button class="button secondary compact-button" id="locateButton" type="button">Me localiser</button>
+                </div>
+              </label>
+
+              <div class="route-fields" id="routeFields" hidden>
+                <label class="field">
+                  <span>Adresse d'arrivée :</span>
+                  <input id="destinationInput" type="search" placeholder="Ex. 20 place Bellecour, Lyon" autocomplete="off" list="destinationSuggestions" />
+                  <datalist id="destinationSuggestions"></datalist>
+                </label>
+                <label class="check-field compact-check">
+                  <input id="allowTolls" type="checkbox" checked />
+                  <span>Autoriser les péages</span>
+                </label>
+                <hr class="form-divider route-divider" />
+              </div>
+
+              <div class="decision-actions">
+                <button class="button primary wide accent-button" id="calculateButton" type="button" data-decision-mode="total">
+                  Le plein le moins cher (€co)
+                </button>
+                <button class="button primary wide local-action" type="button" data-decision-mode="nearest">Station la plus proche (km)</button>
+                <button class="button primary wide route-action" type="button" data-decision-mode="routeLate" hidden>Faire le plein le plus tard possible</button>
+              </div>
+
+              <p class="status-line" id="locationStatus"></p>
+              <div class="route-progress" id="routeProgress" hidden>
+                <img class="progress-mascot" src="assets/mascot.png" alt="" />
+                <div class="route-progress-head">
+                  <strong id="routeProgressLabel">Calcul du trajet</strong>
+                  <span id="routeProgressPercent">0%</span>
+                </div>
+                <div class="progress-track">
+                  <span id="routeProgressFill"></span>
+                </div>
+              </div>
+              <div class="metric-strip recommendation-grid" id="decisionSummary"></div>
+            </section>
+
+            <section class="surface results-surface">
+              <div class="surface-title">
+                <span id="decisionStatus" class="muted">En attente</span>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table decision-table">
+                  <thead>
+                    <tr>
+                      <th class="station-column">Station</th>
+                      <th class="route-only-column route-km-column">
+                        <button class="table-sort" type="button" data-decision-sort="routeKm">
+                          Point KM du trajet
+                        </button>
+                        <span class="info-dot" data-tooltip="Indique à quelle distance du point de départ est située la station.">i</span>
+                      </th>
+                      <th class="route-only-column fuel-remaining-column">
+                        <button class="table-sort" type="button" data-decision-sort="fuelRemaining">
+                          <span>Carburant</span><span>restant estimé</span>
+                        </button>
+                        <span class="info-dot" data-tooltip="Niveau de carburant restant et autonomie estimée à la station.">i</span>
+                      </th>
+                      <th class="distance-column">
+                        <button class="table-sort" id="distanceSortHeader" type="button" data-decision-sort="nearest">
+                          Distance (km)
+                        </button>
+                        <span class="info-dot" id="distanceInfoDot" data-tooltip="Distance entre le départ et la station, avec temps de trajet estimé.">i</span>
+                      </th>
+                      <th class="fill-cost-column">
+                        <button class="table-sort" type="button" data-decision-sort="fill">
+                          Prix carburant<br /><span id="fillLitersHeader"></span>
+                        </button>
+                        <span class="info-dot" data-tooltip="Prix au litre multiplié par le volume estimé du plein.">i</span>
+                      </th>
+                      <th class="vehicle-cost-column">
+                        <button class="table-sort" type="button" data-decision-sort="vehicle">
+                          <span>Prix carburant <span id="fillLitersHeaderVehicle"></span></span><span id="vehicleCostHeaderSuffix">+ coût trajet</span>
+                        </button>
+                        <span class="info-dot" id="vehicleCostInfoDot" data-tooltip="Ajoute le carburant utilisé pour aller à la station et revenir au départ.">i</span>
+                      </th>
+                      <th class="time-cost-column">
+                        <button class="table-sort active" type="button" data-decision-sort="total">
+                          <span>Prix carburant <span id="fillLitersHeaderTime"></span></span><span id="timeCostHeaderSuffix">+ coût trajet + temps payé</span>
+                        </button>
+                        <span class="info-dot" data-tooltip="Ajoute la valeur de ton temps si elle est activée.">i</span>
+                      </th>
+                      <th class="route-links-column"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="decisionResults">
+                    <tr>
+                      <td colspan="5" class="empty-cell">Aucun calcul lancé.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="decisionMap" class="map-canvas decision-map" hidden></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-map" aria-labelledby="Carte France">
+          <section class="surface full-surface">
+            <div class="surface-title map-title">
+              <div class="filter-row fuel-row">
+                <label class="inline-field">
+                  <span>Carburant</span>
+                  <select id="mapFuel">
+                    <option value="Gazole">Gazole</option>
+                    <option value="SP95">SP95 / E10</option>
+                  </select>
+                </label>
+              </div>
+              <div class="period-cluster">
+                <div class="period-shortcuts" data-period-target="map">
+                  <button class="button secondary small" type="button" data-period="today">Jour J</button>
+                  <button class="button secondary small" type="button" data-period="3m">3 mois</button>
+                  <button class="button secondary small" type="button" data-period="6m">6 mois</button>
+                  <button class="button secondary small" type="button" data-period="1y">1 an</button>
+                  <button class="button secondary small" type="button" data-period="ytd">Début d'année</button>
+                  <button class="button secondary small" type="button" data-period="all">Toutes les données</button>
+                </div>
+                <div class="date-row">
+                  <label class="inline-field">
+                    <span>Début</span>
+                    <input id="mapStart" type="date" />
+                  </label>
+                  <label class="inline-field">
+                    <span>Fin</span>
+                    <input id="mapEnd" type="date" />
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div id="franceMap" class="map-canvas"></div>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="tab-dashboard" aria-labelledby="Classement Station">
+          <section class="surface full-surface">
+            <div class="ranking-subtabs" role="group" aria-label="Classements">
+              <button class="mode-chip active" type="button" data-ranking-target="dashboard"><span class="tab-icon-station" aria-hidden="true"></span>Classement des stations</button>
+              <button class="mode-chip" type="button" data-ranking-target="brands"><span aria-hidden="true">★</span>Classement par enseigne</button>
+            </div>
+            <div class="dashboard-workspace">
+              <aside class="dashboard-filter-panel">
+                <div class="filter-block">
+                  <strong>Carburant</strong>
+                  <div class="filter-row fuel-row">
+                    <label class="inline-field">
+                      <span>Carburant</span>
+                      <select id="dashboardFuel">
+                        <option value="Gazole">Gazole</option>
+                        <option value="SP95">SP95 / E10</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+                <div class="filter-block">
+                  <strong>Période</strong>
+                  <div class="period-cluster">
+                    <div class="period-shortcuts" data-period-target="dashboard">
+                      <button class="button secondary small" type="button" data-period="today">Jour J</button>
+                      <button class="button secondary small" type="button" data-period="3m">3 mois</button>
+                      <button class="button secondary small" type="button" data-period="6m">6 mois</button>
+                      <button class="button secondary small" type="button" data-period="1y">1 an</button>
+                      <button class="button secondary small" type="button" data-period="ytd">Début d'année</button>
+                      <button class="button secondary small" type="button" data-period="all">Toutes les données</button>
+                    </div>
+                    <div class="date-row">
+                      <label class="inline-field">
+                        <span>Début</span>
+                        <input id="dashboardStart" type="date" />
+                      </label>
+                      <label class="inline-field">
+                        <span>Fin</span>
+                        <input id="dashboardEnd" type="date" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="filter-block zone-filter">
+                  <strong>Zone</strong>
+                  <label class="inline-field">
+                    <span>Ville ou Code Postal</span>
+                    <input id="dashboardCitySearch" type="search" placeholder="Ex. Niort ou 79000" list="dashboardCitySuggestions" />
+                    <datalist id="dashboardCitySuggestions"></datalist>
+                  </label>
+                  <div id="dashboardDept" class="department-picker" role="group" aria-label="Départements"></div>
+                </div>
+              </aside>
+              <section class="dashboard-table-panel">
+                <div class="kpi-grid" id="dashboardKpis"></div>
+                <div class="table-wrap">
+                  <table class="data-table compact-table">
+                    <thead>
+                      <tr>
+                        <th>Rang</th>
+                        <th>Station</th>
+                        <th>Prix moyen / L</th>
+                        <th>Score de la période</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dashboardTable"></tbody>
+                  </table>
+                </div>
+                <div class="pagination-row" id="dashboardPagination"></div>
+              </section>
+            </div>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="tab-brands" aria-labelledby="Classement par enseigne">
+          <section class="surface full-surface">
+            <div class="ranking-subtabs" role="group" aria-label="Classements">
+              <button class="mode-chip" type="button" data-ranking-target="dashboard"><span class="tab-icon-station" aria-hidden="true"></span>Classement des stations</button>
+              <button class="mode-chip active" type="button" data-ranking-target="brands"><span aria-hidden="true">★</span>Classement par enseigne</button>
+            </div>
+            <div class="brand-ranking-workspace">
+              <aside class="dashboard-filter-panel brand-filter-panel">
+                <div class="filter-block">
+                  <strong>Carburant</strong>
+                  <div class="filter-row fuel-row">
+                    <label class="inline-field">
+                      <span>Carburant</span>
+                      <select id="brandFuel">
+                        <option value="Gazole">Gazole</option>
+                        <option value="SP95">SP95 / E10</option>
+                      </select>
+                    </label>
+                    <label class="inline-field brand-filter-field">
+                      <span>Enseigne</span>
+                      <select id="brandGroupFilter">
+                        <option value="all">Toutes</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+                <div class="filter-block">
+                  <strong>Période</strong>
+                  <div class="period-cluster">
+                    <div class="period-shortcuts" data-period-target="brand">
+                      <button class="button secondary small" type="button" data-period="today">Jour J</button>
+                      <button class="button secondary small" type="button" data-period="3m">3 mois</button>
+                      <button class="button secondary small" type="button" data-period="6m">6 mois</button>
+                      <button class="button secondary small" type="button" data-period="1y">1 an</button>
+                      <button class="button secondary small" type="button" data-period="ytd">Début d'année</button>
+                      <button class="button secondary small" type="button" data-period="all">Toutes les données</button>
+                    </div>
+                    <div class="date-row">
+                      <label class="inline-field">
+                        <span>Début</span>
+                        <input id="brandStart" type="date" />
+                      </label>
+                      <label class="inline-field">
+                        <span>Fin</span>
+                        <input id="brandEnd" type="date" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="filter-block zone-filter">
+                  <strong>Zone</strong>
+                  <div id="brandDept" class="department-picker" role="group" aria-label="Départements"></div>
+                </div>
+              </aside>
+              <section class="brand-ranking-panel">
+                <div class="brand-podium" id="brandPodium"></div>
+                <div class="brand-list" id="brandList"></div>
+              </section>
+            </div>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="tab-graphs" aria-labelledby="Statistiques">
+          <div class="graphs-grid">
+            <section class="surface">
+              <div class="surface-title stacked-title">
+                <h2>Evolution du prix médian en France</h2>
+                <div class="chart-filter-layout price-filter-layout">
+                  <div class="filter-row fuel-row">
+                    <label class="inline-field">
+                      <span>Carburant</span>
+                      <select id="graphFuel">
+                        <option value="Gazole">Gazole</option>
+                        <option value="SP95">SP95 / E10</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="period-cluster">
+                    <div class="period-shortcuts" id="graphPeriodShortcuts">
+                      <button class="button secondary small" type="button" data-graph-period="3m">3 mois</button>
+                      <button class="button secondary small" type="button" data-graph-period="6m">6 mois</button>
+                      <button class="button secondary small" type="button" data-graph-period="1y">1 an</button>
+                      <button class="button secondary small" type="button" data-graph-period="ytd">Début d'année</button>
+                      <button class="button secondary small" type="button" data-graph-period="all">Toutes les données</button>
+                    </div>
+                    <div class="date-row">
+                      <label class="inline-field">
+                        <span>Début</span>
+                        <input id="graphStart" type="date" />
+                      </label>
+                      <label class="inline-field">
+                        <span>Fin</span>
+                        <input id="graphEnd" type="date" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="chart-note" id="priceChartInfo"></p>
+              <div class="chart-box">
+                <div id="priceChart" class="svg-chart"></div>
+              </div>
+            </section>
+
+            <section class="surface">
+              <div class="surface-title stacked-title">
+                <h2>Répartition des prix</h2>
+                <div class="distribution-filter-layout">
+                  <div class="filter-row distribution-top-filters">
+                    <label class="inline-field">
+                      <span>Carburant</span>
+                      <select id="distributionFuel">
+                        <option value="Gazole">Gazole</option>
+                        <option value="SP95">SP95 / E10</option>
+                      </select>
+                    </label>
+                    <label class="inline-field">
+                      <span>Date</span>
+                      <input id="distributionDate" type="date" />
+                    </label>
+                  </div>
+                  <div id="graphDept" class="department-picker" role="group" aria-label="Départements"></div>
+                </div>
+              </div>
+              <p class="chart-note" id="distributionMeta"></p>
+              <div class="chart-box">
+                <div id="distributionChart" class="svg-chart"></div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+
+      <aside class="settings-panel" id="settingsPanel" aria-hidden="true">
+        <div class="settings-card">
+          <div class="surface-title">
+            <button class="tab-button home-tab icon-only-tab" id="closeSettings" type="button" aria-label="Retour au plein">
+              <span class="button-icon back-arrow-icon" aria-hidden="true"></span>
+            </button>
+            <h2><span class="settings-gear title-gear" aria-hidden="true"></span>Paramètres</h2>
+          </div>
+
+          <nav class="settings-tabs" aria-label="Sections paramètres">
+            <button class="settings-tab active" type="button" data-settings-tab="vehicles">Mes véhicules</button>
+            <button class="settings-tab" type="button" data-settings-tab="preferences">Préférences</button>
+            <button class="settings-tab" type="button" data-settings-tab="places">Lieux favoris</button>
+            <button class="settings-tab" type="button" data-settings-tab="account">Mon compte</button>
+          </nav>
+
+          <section class="settings-page active" id="settings-vehicles">
+            <div class="settings-layout">
+              <section class="settings-section">
+                <h3>Mes véhicules</h3>
+                <select id="settingsVehicleSelect" hidden></select>
+                <div class="vehicle-list" id="vehicleList"></div>
+              </section>
+
+              <form id="vehicleForm" class="vehicle-form">
+                <div class="surface-title">
+                  <h3 id="vehicleFormTitle"></h3>
+                  <button class="button secondary small" id="cancelVehicleEdit" type="button" hidden>Annuler</button>
+                </div>
+                <div class="form-grid">
+                  <input id="vehicleName" type="hidden" />
+                  <label class="field wide-field">
+                    <span>Modèle</span>
+                    <input id="vehicleModelSearch" type="search" list="vehicleCatalogSuggestions" placeholder="Ex. Renault Clio, Peugeot 208..." autocomplete="off" />
+                    <datalist id="vehicleCatalogSuggestions"></datalist>
+                  </label>
+                  <input id="vehicleBrand" type="hidden" />
+                  <input id="vehicleModel" type="hidden" />
+                  <label class="field">
+                    <span>Carburant</span>
+                    <select id="vehicleFuel">
+                      <option value="Gazole">Gazole</option>
+                      <option value="SP95">SP95 / E10</option>
+                    </select>
+                  </label>
+                  <input id="vehicleYear" type="hidden" value="2026" />
+                  <input id="vehiclePower" type="hidden" value="" />
+                  <label class="field">
+                    <span>Réservoir</span>
+                    <div class="input-with-unit">
+                      <input id="vehicleTank" required type="number" min="5" max="140" step="1" value="40" />
+                      <span>L</span>
+                    </div>
+                  </label>
+                  <label class="field">
+                    <span>Conso moyenne</span>
+                    <div class="input-with-unit">
+                      <input id="vehicleConsumption" required type="number" min="2" max="20" step="0.1" value="6.7" />
+                      <span>L/100</span>
+                    </div>
+                  </label>
+                  <label class="field">
+                    <span>Prix neuf estimé</span>
+                    <div class="input-with-unit">
+                      <input id="vehicleCatalogPrice" required type="number" min="5000" max="250000" step="500" value="20000" />
+                      <span>€</span>
+                    </div>
+                  </label>
+                  <label class="field">
+                    <span>Décote estimée</span>
+                    <output id="vehicleDepreciationKm" class="readonly-output">0,055 €/km</output>
+                  </label>
+                </div>
+                <input id="editingVehicleId" type="hidden" />
+                <button class="button primary wide" type="submit">
+                  <span class="button-icon" aria-hidden="true">+</span>
+                  <span id="vehicleSubmitLabel">Ajouter la voiture</span>
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <section class="settings-page" id="settings-preferences">
+            <section class="settings-section">
+              <h3>Valorisation du temps d'un détour</h3>
+              <label class="field">
+                <span>Quelle économie sur le plein dois-je faire pour accepter de faire 1h de détour ?</span>
+                <div class="range-row">
+                  <input id="timeMinutesFor10" type="range" min="5" max="60" value="10" step="5" />
+                  <output id="timeMinutesOutput" for="timeMinutesFor10">10 €</output>
+                </div>
+              </label>
+              <label class="check-field">
+                <input id="ignoreTimeCost" type="checkbox" />
+                <span>Ne pas prendre en compte mon temps - J'ai le temps</span>
+              </label>
+            </section>
+            <section class="settings-section">
+              <h3>Qualité des stations affichées</h3>
+              <div class="form-grid station-rating-preferences">
+                <label class="field">
+                  <span>Prix déclaré</span>
+                  <select id="ratingPriceFilter">
+                    <option value="0">Afficher toutes les stations</option>
+                    <option value="1">Moyennes et bonnes seulement</option>
+                    <option value="2">Bonnes seulement</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Propreté</span>
+                  <select id="ratingCleanFilter">
+                    <option value="0">Afficher toutes les stations</option>
+                    <option value="1">Moyennes et bonnes seulement</option>
+                    <option value="2">Bonnes seulement</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Service</span>
+                  <select id="ratingServiceFilter">
+                    <option value="0">Afficher toutes les stations</option>
+                    <option value="1">Moyennes et bonnes seulement</option>
+                    <option value="2">Bonnes seulement</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+            <section class="settings-section">
+              <h3>Colonnes complémentaires</h3>
+              <div class="column-preferences-grid">
+                <div class="column-pref-group">
+                  <strong>Autour de moi</strong>
+                  <label class="check-field"><input type="checkbox" id="prefLocalFill" data-column-pref="local.fill" /><span>Prix carburant seul</span><span class="info-dot" data-tooltip="Prix du carburant sans coût du trajet.">i</span></label>
+                  <label class="check-field"><input type="checkbox" id="prefLocalVehicle" data-column-pref="local.vehicle" /><span>Prix avec coût trajet</span><span class="info-dot" data-tooltip="Ajoute le carburant consommé pour l'aller-retour.">i</span></label>
+                  <label class="check-field"><input type="checkbox" id="prefLocalTime" data-column-pref="local.time" /><span>Prix avec temps payé</span><span class="info-dot" data-tooltip="Ajoute la valeur du temps si elle est activée.">i</span></label>
+                </div>
+                <div class="column-pref-group">
+                  <strong>Sur un trajet</strong>
+                  <label class="check-field"><input type="checkbox" id="prefRouteFill" data-column-pref="route.fill" /><span>Prix carburant seul</span><span class="info-dot" data-tooltip="Prix du plein à ce point du trajet.">i</span></label>
+                  <label class="check-field"><input type="checkbox" id="prefRouteVehicle" data-column-pref="route.vehicle" /><span>Prix avec coût détour</span><span class="info-dot" data-tooltip="Ajoute le coût du détour jusqu'à la station.">i</span></label>
+                  <label class="check-field"><input type="checkbox" id="prefRouteTime" data-column-pref="route.time" /><span>Prix avec temps payé</span><span class="info-dot" data-tooltip="Ajoute la valeur du temps du détour.">i</span></label>
+                </div>
+              </div>
+            </section>
+          </section>
+
+          <section class="settings-page" id="settings-places">
+            <section class="settings-section">
+              <h3>Adresses favorites</h3>
+              <label class="field">
+                <span>Adresse favorite</span>
+                <input id="favoriteAddressInput" type="search" placeholder="Ex. 12 rue de Paris, Rambouillet" autocomplete="off" list="favoriteAddressSuggestions" />
+                <datalist id="favoriteAddressSuggestions"></datalist>
+              </label>
+              <div class="button-row">
+                <button class="button primary" id="addFavoriteAddress" type="button">+ Ajouter cette adresse</button>
+              </div>
+              <div class="favorite-place-list" id="favoritePlacesList"></div>
+            </section>
+          </section>
+
+          <section class="settings-page" id="settings-account">
+            <section class="settings-section">
+              <h3>Mon compte</h3>
+              <div class="form-grid account-fields-row">
+                <label class="field">
+                  <span>Email</span>
+                  <input id="accountEmail" type="email" readonly />
+                </label>
+                <label class="field">
+                  <span>Nouveau mot de passe</span>
+                  <input id="accountPassword" type="password" autocomplete="new-password" placeholder="Laisser vide si inchangé" />
+                </label>
+                <label class="field">
+                  <span>Confirmer le mot de passe</span>
+                  <input id="accountPasswordConfirm" type="password" autocomplete="new-password" placeholder="Confirmer le nouveau mot de passe" />
+                </label>
+                <div class="password-strength wide-field" aria-live="polite">
+                  <div class="strength-track"><span id="accountPasswordStrengthFill"></span></div>
+                  <small id="accountPasswordStrengthText">8 caractères, majuscule, minuscule, chiffre et symbole.</small>
+                </div>
+              </div>
+              <hr class="settings-divider" />
+              <button class="button primary" id="saveAccountPreferences" type="button">Enregistrer le changement</button>
+            </section>
+            <section class="settings-section admin-section" id="adminSection" hidden>
+              <h3>Administration des comptes</h3>
+              <hr class="settings-divider" />
+              <label class="field">
+                <span>Recherche email</span>
+                <input id="accountSearch" type="search" placeholder="email du compte" />
+              </label>
+              <hr class="settings-divider" />
+              <div class="account-list" id="accountList"></div>
+            </section>
+          </section>
+        </div>
+      </aside>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,48 @@
+name: Mise à jour données carburant + déploiement FTP
+
+on:
+  workflow_dispatch:          # déclenchement manuel possible
+  schedule:
+    - cron: "35 5 * * *"     # tous les jours à 5h35 UTC (7h35 heure française)
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances Python
+        run: pip install requests
+
+      - name: Générer les données carburant
+        run: |
+          python scripts/build_data.py \
+            --source instant \
+            --output data \
+            --history-start-year 2025
+
+      - name: Préparer le paquet de déploiement
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          cp index.html robots.txt sitemap.xml site.webmanifest dist/
+          cp -R assets data dist/
+
+      - name: Déployer sur le FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          exclude: |
+            **/.git*
+            **/.git*/**
