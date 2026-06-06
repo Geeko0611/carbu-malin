@@ -35,24 +35,58 @@ jobs:
           cp index.html robots.txt sitemap.xml site.webmanifest dist/
           cp -R assets data dist/
 
-      - name: Installer lftp
-        run: sudo apt-get install -y lftp
-
-      - name: Déployer sur le FTP via lftp
+      - name: Déployer sur le FTP via Python ftplib
         env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_HOST: ${{ secrets.FTP_SERVER }}
           FTP_USER: ${{ secrets.FTP_USERNAME }}
           FTP_PASS: ${{ secrets.FTP_PASSWORD }}
           FTP_DIR: ${{ secrets.FTP_SERVER_DIR }}
         run: |
-          lftp -c "
-            set ftp:ssl-allow yes;
-            set ftp:ssl-force no;
-            set ssl:verify-certificate no;
-            set ftp:passive-mode yes;
-            set net:timeout 30;
-            set net:max-retries 3;
-            open -u '$FTP_USER','$FTP_PASS' ftp://$FTP_SERVER;
-            mirror --reverse --delete --verbose --exclude='.git' ./dist/ $FTP_DIR;
-            quit
-          "
+          python - <<'EOF'
+          import ftplib, os, sys
+          from pathlib import Path
+
+          host = os.environ["FTP_HOST"]
+          user = os.environ["FTP_USER"]
+          passwd = os.environ["FTP_PASS"]
+          remote_root = os.environ["FTP_DIR"].rstrip("/")
+          local_root = Path("dist")
+
+          MAX_SIZE = 15 * 1024 * 1024  # skip files > 15 MB
+
+          def ftp_mkdirs(ftp, remote_path):
+              parts = remote_path.strip("/").split("/")
+              current = ""
+              for part in parts:
+                  current += "/" + part
+                  try:
+                      ftp.mkd(current)
+                  except ftplib.error_perm:
+                      pass
+
+          def upload_dir(ftp, local_dir, remote_dir):
+              ftp_mkdirs(ftp, remote_dir)
+              for item in sorted(local_dir.iterdir()):
+                  remote_path = f"{remote_dir}/{item.name}"
+                  if item.is_dir():
+                      upload_dir(ftp, item, remote_path)
+                  elif item.is_file():
+                      size = item.stat().st_size
+                      if size > MAX_SIZE:
+                          print(f"  SKIP {remote_path} ({size//1024//1024}MB)")
+                          continue
+                      with open(item, "rb") as f:
+                          ftp.storbinary(f"STOR {remote_path}", f)
+                      print(f"  OK   {remote_path} ({size//1024}KB)")
+
+          print(f"Connexion à {host}...")
+          ftp = ftplib.FTP()
+          ftp.connect(host, 21, timeout=60)
+          ftp.login(user, passwd)
+          ftp.set_pasv(True)
+          print("Connecté.")
+
+          upload_dir(ftp, local_root, remote_root)
+          ftp.quit()
+          print("Déploiement terminé.")
+          EOF
