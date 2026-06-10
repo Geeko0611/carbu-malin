@@ -175,12 +175,12 @@ const DEFAULT_SETTINGS = {
     service: 0,
   },
   timeMinutesFor10: 10,
-  ignoreTimeCost: true,
+  ignoreTimeCost: false,
   priceView: "vehicle",
-  columnPreferencesVersion: 2,
+  columnPreferencesVersion: 3,
   columnPreferences: {
-    local: { fill: false, vehicle: false, time: false },
-    route: { fill: false, vehicle: false, time: false },
+    local: { fill: true, vehicle: true, time: true },
+    route: { fill: true, vehicle: true, time: true },
   },
   vehicles: [
     {
@@ -261,6 +261,7 @@ const state = {
   routeLine: null,
   dashboardRows: [],
   dashboardPage: 1,
+  selectedDashboardBrands: null,
   selectedDepartmentsByPicker: {
     dashboardDept: null,
     graphDept: null,
@@ -288,6 +289,7 @@ async function init() {
     await loadData();
     setupDateControls();
     populateDepartmentSelects();
+    populateDashboardBrandPicker();
     if (state.currentAccountId) {
       enterApp(state.currentAccountId);
     } else {
@@ -1171,7 +1173,7 @@ function vehicleDisplayName(vehicle) {
 }
 
 function vehicleMetaLabel(vehicle) {
-  return `${fuelLabel(vehicle.fuel)} - ${formatNumber(vehicle.consumptionL100 || 0, 1)}L`;
+  return `${fuelLabel(vehicle.fuel)} - ${vehicle.tankLiters}L - ${formatNumber(vehicle.consumptionL100 || 0, 1)}L/100`;
 }
 
 function vehicleSelectLabel(vehicle) {
@@ -1662,7 +1664,7 @@ async function locateUser(options = {}) {
     };
     byId("cityInput").value = "Position actuelle";
     saveAccountState();
-    setText("locationStatus", options.quiet ? "" : "Position actuelle enregistrée.");
+    setText("locationStatus", "");
     return state.origin;
   } catch (error) {
     setText("locationStatus", "Localisation impossible. Indiquez une ville.");
@@ -1734,7 +1736,7 @@ async function geocodeCity(query) {
 
 function looksLikeStreetAddress(query) {
   const text = String(query || "");
-  return /\d+\s+\p{L}/u.test(text) || /\b(rue|avenue|boulevard|route|chemin|impasse|place|allee|allée)\b/i.test(text);
+  return /\d+\s+\p{L}/u.test(text) || /\b(rue|avenue|boulevard|route|chemin|impasse|place|allee|allée|strasse|straße|via|calle|carrer|rua|straat|weg|laan|gasse|platz|piazza|avenida|paseo|corso|viale)\b/i.test(text);
 }
 
 async function geocodeRemote(query) {
@@ -1745,7 +1747,7 @@ async function geocodeRemote(query) {
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", "1");
-  url.searchParams.set("countrycodes", "fr");
+  url.searchParams.set("countrycodes", "fr,de,gb,es,it,nl,be,ch,at,pt,lu,dk,se,no,fi,cz,hu,ro,sk,si,hr,bg,ee,lv,lt,ie,gr,cy,mt,pl,ad,mc,li,sm");
   url.searchParams.set("q", query);
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), ROUTE_TIMEOUT_MS);
@@ -1773,7 +1775,13 @@ async function geocodeRemote(query) {
   return null;
 }
 
+const FOREIGN_COUNTRY_KEYWORDS = /\b(belgique|belgium|belgie|deutschland|germany|allemagne|españa|spain|espagne|italia|italy|italie|nederland|netherlands|pays[- ]bas|schweiz|switzerland|suisse|austria|autriche|österreich|portugal|polska|poland|pologne|dansk|denmark|danemark|sverige|sweden|suède|norge|norway|norvège|suomi|finland|finlande|czech|tchèque|hrvatska|croatia|croatie|slovenija|slovaquie|romania|roumanie|bulgaria|bulgarie|ireland|irlande|grèce|greece|luxembourg|monaco|andorra|andorre|liechtenstein|malte|malta|chypre|cyprus|estonia|estonie|latvia|lettonie|lithuania|lituanie)\b/i;
+
 async function geocodeFrenchAddress(query) {
+  // Ne pas appeler l'API française si la requête mentionne un pays étranger
+  if (FOREIGN_COUNTRY_KEYWORDS.test(query)) {
+    return null;
+  }
   const url = new URL("https://api-adresse.data.gouv.fr/search/");
   url.searchParams.set("q", query);
   url.searchParams.set("limit", "1");
@@ -1791,6 +1799,10 @@ async function geocodeFrenchAddress(query) {
     const payload = await response.json();
     const feature = payload.features?.[0];
     if (!feature?.geometry?.coordinates?.length) {
+      return null;
+    }
+    // Rejeter les résultats peu pertinents (score < 0.5)
+    if (Number(feature.properties?.score ?? 0) < 0.5) {
       return null;
     }
     const [lon, lat] = feature.geometry.coordinates;
@@ -2057,8 +2069,8 @@ async function runDecision() {
     button.disabled = true;
   });
   syncDecisionTimeColumn();
-  setText("decisionStatus", "Calcul en cours...");
-  byId("decisionResults").innerHTML = `<tr><td colspan="${decisionColumnCount()}" class="empty-cell">Calcul en cours...</td></tr>`;
+  setText("decisionStatus", "");
+  showDecisionLoader();
   byId("decisionMap").hidden = true;
 
   try {
@@ -2147,8 +2159,8 @@ async function runRouteDecision() {
   });
   syncDecisionTimeColumn();
   showRouteProgress(4, "Préparation du trajet");
-  setText("decisionStatus", "Calcul du trajet...");
-  byId("decisionResults").innerHTML = `<tr><td colspan="${decisionColumnCount()}" class="empty-cell">Calcul du trajet...</td></tr>`;
+  setText("decisionStatus", "");
+  showDecisionLoader();
   byId("decisionMap").hidden = true;
 
   try {
@@ -2587,6 +2599,14 @@ function sampleRouteKilometers(coordinates, routeDistanceKm) {
   }
   points.push({ ...coordinates[coordinates.length - 1], km: Math.round(routeDistanceKm) });
   return points;
+}
+
+function showDecisionLoader() {
+  byId("decisionResults").innerHTML = `
+    <tr><td colspan="${decisionColumnCount()}" class="decision-loader-cell">
+      <img class="decision-loader-croc" src="assets/mascot-center.png" alt="" />
+    </td></tr>
+  `;
 }
 
 function showRouteProgress(percent, label) {
@@ -4189,6 +4209,73 @@ function departmentLabel(departments) {
     : `${departments.length} départements`;
 }
 
+function brandRankingScores() {
+  const totals = new Map();
+  const counts = new Map();
+  FUELS.forEach((fuel) => {
+    currentStationMetrics(fuel).forEach((station) => {
+      const brand = brandGroupName(station);
+      totals.set(brand, (totals.get(brand) || 0) + (station.score || 0));
+      counts.set(brand, (counts.get(brand) || 0) + 1);
+    });
+  });
+  const result = new Map();
+  totals.forEach((total, brand) => result.set(brand, total / (counts.get(brand) || 1)));
+  return result;
+}
+
+const BRAND_DISPLAY_ORDER = [
+  "E.Leclerc", "Coopérative U", "Mousquetaires", "Auchan",
+  "Carrefour", "TotalEnergies", "Station indépendante",
+];
+
+function populateDashboardBrandPicker() {
+  const picker = byId("dashboardBrandPicker");
+  if (!picker) return;
+  const eligible = eligibleBrandSet();
+  const ordered = BRAND_DISPLAY_ORDER.filter((b) => eligible.has(b));
+  const rest = [...eligible].filter((b) => !BRAND_DISPLAY_ORDER.includes(b)).sort((a, b) => a.localeCompare(b, "fr"));
+  const brands = [...ordered, ...rest];
+  picker.innerHTML = brands.map((brand) => {
+    const src = BRAND_LOGOS[brand];
+    const img = src
+      ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(brand)}" />`
+      : `<span class="brand-chip-label">${escapeHtml(brandInitials(brand))}</span>`;
+    return `<button class="brand-logo-chip active" type="button" data-brand-filter="${escapeHtml(brand)}" title="${escapeHtml(brand)}">${img}</button>`;
+  }).join("");
+
+  picker.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-brand-filter]");
+    if (!btn) return;
+    const brand = btn.dataset.brandFilter;
+    const allBrands = new Set([...picker.querySelectorAll("[data-brand-filter]")].map((b) => b.dataset.brandFilter));
+    if (!state.selectedDashboardBrands) {
+      state.selectedDashboardBrands = new Set([brand]);
+    } else {
+      const next = new Set(state.selectedDashboardBrands);
+      if (next.has(brand)) {
+        next.delete(brand);
+        state.selectedDashboardBrands = next.size === 0 ? null : next;
+      } else {
+        next.add(brand);
+        state.selectedDashboardBrands = next.size === allBrands.size ? null : next;
+      }
+    }
+    renderDashboardBrandPicker();
+    state.dashboardPage = 1;
+    void renderDashboard();
+  });
+}
+
+function renderDashboardBrandPicker() {
+  const picker = byId("dashboardBrandPicker");
+  if (!picker) return;
+  picker.querySelectorAll("[data-brand-filter]").forEach((btn) => {
+    const active = !state.selectedDashboardBrands || state.selectedDashboardBrands.has(btn.dataset.brandFilter);
+    btn.classList.toggle("active", active);
+  });
+}
+
 function normalizeDepartmentCode(department, cp = "") {
   const code = String(department || "").trim().toUpperCase();
   const postal = String(cp || "").trim();
@@ -4208,6 +4295,7 @@ async function renderDashboard() {
   const cpNeedle = (searchValue.match(/^\d{5}/) || [""])[0];
   const rows = metrics
     .filter((station) => matchesDepartments(station, departments))
+    .filter((station) => !state.selectedDashboardBrands || state.selectedDashboardBrands.has(brandGroupName(station)))
     .filter((station) => {
       if (cpNeedle) {
         return String(station.cp || "").startsWith(cpNeedle);

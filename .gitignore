@@ -2,3 +2,6 @@ data/*.json
 __pycache__/
 *.pyc
 dist/
+.env.local
+update_and_deploy.log
+.trash/

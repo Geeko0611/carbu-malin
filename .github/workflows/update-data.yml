@@ -4,6 +4,8 @@ on:
   workflow_dispatch:          # déclenchement manuel possible
   schedule:
     - cron: "35 5 * * *"     # tous les jours à 5h35 UTC (7h35 heure française)
+  push:
+    branches: [main]          # full deploy automatique à chaque merge sur main
 
 jobs:
   update-and-deploy:
@@ -30,12 +32,12 @@ jobs:
 
       - name: Préparer le paquet de déploiement
         run: |
-          rm -rf dist
-          mkdir -p dist
-          cp index.html robots.txt sitemap.xml site.webmanifest dist/
-          cp -R assets data dist/
+          rm -rf dist && mkdir -p dist
+          cp index.html robots.txt site.webmanifest sitemap.xml dist/
+          cp -R assets dist/
+          cp -R data dist/
 
-      - name: Déployer sur le FTP via Python ftplib
+      - name: Déployer sur le FTP
         env:
           FTP_HOST: ${{ secrets.FTP_SERVER }}
           FTP_USER: ${{ secrets.FTP_USERNAME }}
@@ -43,7 +45,7 @@ jobs:
           FTP_DIR: ${{ secrets.FTP_SERVER_DIR }}
         run: |
           python - <<'EOF'
-          import ftplib, os, sys
+          import ftplib, os
           from pathlib import Path
 
           host = os.environ["FTP_HOST"]
@@ -52,7 +54,7 @@ jobs:
           remote_root = os.environ["FTP_DIR"].rstrip("/")
           local_root = Path("dist")
 
-          MAX_SIZE = 15 * 1024 * 1024  # skip files > 15 MB
+          MAX_SIZE = 15 * 1024 * 1024
 
           def ftp_mkdirs(ftp, remote_path):
               parts = remote_path.strip("/").split("/")
@@ -85,7 +87,6 @@ jobs:
           ftp.login(user, passwd)
           ftp.set_pasv(True)
           print("Connecté.")
-
           upload_dir(ftp, local_root, remote_root)
           ftp.quit()
           print("Déploiement terminé.")

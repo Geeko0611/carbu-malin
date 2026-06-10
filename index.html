@@ -160,14 +160,6 @@
                 <button class="mode-chip active" type="button" data-analysis-mode="local">Autour de moi</button>
                 <button class="mode-chip" type="button" data-analysis-mode="route">Sur un trajet</button>
               </div>
-              <div class="decision-price-view">
-                <span>Afficher le prix :</span>
-                <div class="segmented-control compact-segmented" role="group" aria-label="Prix affiché dans les résultats">
-                  <button class="mode-chip" type="button" data-price-view="fill">Carburant seul</button>
-                  <button class="mode-chip active" type="button" data-price-view="vehicle">Avec coût du trajet</button>
-                </div>
-              </div>
-
               <label class="field">
                 <span>Voiture</span>
                 <div class="vehicle-select-row">
@@ -354,38 +346,46 @@
             </div>
             <div class="dashboard-workspace">
               <aside class="dashboard-filter-panel">
-                <div class="filter-block">
-                  <strong>Carburant</strong>
-                  <div class="filter-row fuel-row">
-                    <label class="inline-field">
-                      <span>Carburant</span>
-                      <select id="dashboardFuel">
-                        <option value="Gazole">Gazole</option>
-                        <option value="SP95">SP95 / E10</option>
-                      </select>
-                    </label>
-                  </div>
-                </div>
-                <div class="filter-block">
-                  <strong>Période</strong>
-                  <div class="period-cluster">
-                    <div class="period-shortcuts" data-period-target="dashboard">
-                      <button class="button secondary small" type="button" data-period="today">Jour J</button>
-                      <button class="button secondary small" type="button" data-period="3m">3 mois</button>
-                      <button class="button secondary small" type="button" data-period="6m">6 mois</button>
-                      <button class="button secondary small" type="button" data-period="1y">1 an</button>
-                      <button class="button secondary small" type="button" data-period="ytd">Début d'année</button>
-                      <button class="button secondary small" type="button" data-period="all">Toutes les données</button>
+                <div class="dashboard-top-filters">
+                  <div class="dashboard-left-filters">
+                    <div class="filter-block">
+                      <strong>Carburant</strong>
+                      <div class="filter-row fuel-row">
+                        <label class="inline-field">
+                          <span>Carburant</span>
+                          <select id="dashboardFuel">
+                            <option value="Gazole">Gazole</option>
+                            <option value="SP95">SP95 / E10</option>
+                          </select>
+                        </label>
+                      </div>
                     </div>
-                    <div class="date-row">
-                      <label class="inline-field">
-                        <span>Début</span>
-                        <input id="dashboardStart" type="date" />
-                      </label>
-                      <label class="inline-field">
-                        <span>Fin</span>
-                        <input id="dashboardEnd" type="date" />
-                      </label>
+                    <div class="filter-block">
+                      <strong>Enseigne</strong>
+                      <div class="brand-logo-picker" id="dashboardBrandPicker"></div>
+                    </div>
+                  </div>
+                  <div class="filter-block dashboard-period-filter">
+                    <strong>Période</strong>
+                    <div class="period-cluster">
+                      <div class="period-shortcuts" data-period-target="dashboard">
+                        <button class="button secondary small" type="button" data-period="today">Jour J</button>
+                        <button class="button secondary small" type="button" data-period="3m">3 mois</button>
+                        <button class="button secondary small" type="button" data-period="6m">6 mois</button>
+                        <button class="button secondary small" type="button" data-period="1y">1 an</button>
+                        <button class="button secondary small" type="button" data-period="ytd">Début d'année</button>
+                        <button class="button secondary small" type="button" data-period="all">Toutes les données</button>
+                      </div>
+                      <div class="date-row">
+                        <label class="inline-field">
+                          <span>Début</span>
+                          <input id="dashboardStart" type="date" />
+                        </label>
+                        <label class="inline-field">
+                          <span>Fin</span>
+                          <input id="dashboardEnd" type="date" />
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>
