@@ -4,6 +4,11 @@ const MAX_SEARCH_KM = 50;
 const ROUTE_AERIAL_RADIUS_KM = 10;
 const TANK_SAFETY_RATIO = 0.1;
 const ROAD_DETOUR_FACTOR = 1.22;
+// Le rayon de 10 km est à vol d'oiseau (rapide). Après calcul d'itinéraire réel, on écarte les
+// stations dont le détour routier aller dépasse ce plafond (ex. station de l'autre côté d'un
+// fleuve : proche à vol d'oiseau mais très loin par la route).
+const MAX_ROUTE_DETOUR_ONE_WAY_KM = 15;
+const ROUTE_CANDIDATE_BUFFER = 14;
 const MAX_ROUTE_CALLS = 5;
 const ROUTE_CONCURRENCY = 5;
 const ROUTE_TIMEOUT_MS = 4500;
@@ -2300,13 +2305,22 @@ async function runRouteDecision() {
           }
         }
       }
-      candidates = [...stationBest.values()].sort((a, b) => a.vehicleLiter - b.vehicleLiter).slice(0, 10);
+      // On garde un tampon de candidats (par €/L estimé à vol d'oiseau) ; le détour routier réel
+      // est calculé ensuite, puis on écarte les détours aberrants avant de retenir le top 10.
+      candidates = [...stationBest.values()].sort((a, b) => a.vehicleLiter - b.vehicleLiter).slice(0, ROUTE_CANDIDATE_BUFFER);
       state.decisionSort = "vehicle";
     }
     if (!candidates.length) {
       throw new Error("Aucune station pertinente trouvée sur ce trajet avec l'autonomie disponible.");
     }
     await refineRouteCandidateDistances(candidates, vehicle);
+    if (state.decisionMode !== "routeLate") {
+      // Après le calcul d'itinéraire réel : écarte les stations au détour routier impraticable.
+      const reasonable = candidates.filter((candidate) => oneWayDistance(candidate) <= MAX_ROUTE_DETOUR_ONE_WAY_KM);
+      candidates = (reasonable.length ? reasonable : candidates).slice(0, 10);
+    } else {
+      candidates = candidates.slice(0, 10);
+    }
 
     state.decisionAllCandidates = candidates;
     state.decisionCandidates = candidates;
@@ -2397,9 +2411,9 @@ async function refineRouteCandidateDistances(candidates, vehicle) {
   const targets = candidates.filter((candidate) => candidate.routeEstimated && candidate.routePointLat && candidate.routePointLon);
   const tank = clampNumber(vehicle.tankLiters, 5, 140, 40);
   const consumption = clampNumber(vehicle.consumptionL100, 2, 20, 5.5);
-  await processPool(targets.slice(0, 10), ROUTE_CONCURRENCY, async (candidate) => {
+  await processPool(targets.slice(0, ROUTE_CANDIDATE_BUFFER), ROUTE_CONCURRENCY, async (candidate) => {
     // Affine le détour estimé (à vol d'oiseau × 1,22) par un vrai calcul d'itinéraire
-    // du point km vers la station, pour les 10 stations retenues.
+    // du point km vers la station, pour les candidats retenus.
     const route = await withTimeout(
       routeToStation({ lat: candidate.routePointLat, lon: candidate.routePointLon }, candidate.station),
       ROUTE_TIMEOUT_MS + 400,
