@@ -5943,3 +5943,19 @@ body.auth-page {
 .control-surface .vehicle-select-meta {
   font-size: 0.75rem;
 }
+
+/* === Correctif affichage mobile — empêche le scroll latéral (interim avant refonte design) ===
+   Deux règles tardives non conditionnelles cassaient le responsive :
+   - .decision-grid (≈l.2508) gardait 2 colonnes -> la zone résultats partait hors écran ;
+   - .table-wrap (≈l.3676) overflow:visible -> les tableaux larges élargissaient la page,
+     décalant visuellement les vues stats/paramètres.
+   On ré-affirme ici l'empilement mobile et le confinement horizontal des tableaux. */
+@media (max-width: 980px) {
+  .decision-grid {
+    grid-template-columns: 1fr;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
