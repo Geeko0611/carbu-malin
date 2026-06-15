@@ -385,8 +385,14 @@ function bindEvents() {
     if (stationToggle) {
       const cell = stationToggle.closest(".station-cell");
       const address = cell?.querySelector(".station-address");
+      const willHide = address ? !address.hidden : true;
       if (address) {
-        address.hidden = !address.hidden;
+        address.hidden = willHide;
+      }
+      // Déplie aussi le détail mobile (colonnes secondaires) de la même ligne.
+      const extra = stationToggle.closest("td")?.querySelector(".row-mobile-extra");
+      if (extra) {
+        extra.hidden = willHide;
       }
       return;
     }
@@ -2720,17 +2726,27 @@ function renderDecisionSummary(candidates) {
     setText("locationStatus", "");
     return;
   }
-  const recommendations = [
-    { title: "Le plein le moins cher (€co)", sortKey: "total", candidate: sortDecisionCandidates(candidates, "total")[0] },
-    { title: "Station la plus proche (km)", sortKey: "nearest", candidate: sortDecisionCandidates(candidates, "nearest")[0] },
-  ];
+  // D : la carte « moins cher » suit le tri actif du tableau -> elle correspond toujours à la 1re ligne.
+  const cheapestSort = state.decisionSort || state.settings.priceView || "vehicle";
+  const cheapest = sortDecisionCandidates(candidates, cheapestSort)[0];
+  const nearest = sortDecisionCandidates(candidates, "nearest")[0];
+  let recommendations;
+  if (cheapest && nearest && cheapest.station.id === nearest.station.id) {
+    // C : station la plus proche = la moins chère -> une seule carte au lieu de deux identiques.
+    recommendations = [{ title: "La plus proche ET la moins chère", accent: true, candidate: cheapest }];
+  } else {
+    recommendations = [
+      { title: "Le plein le moins cher (€co)", accent: true, candidate: cheapest },
+      { title: "Station la plus proche (km)", accent: false, candidate: nearest },
+    ];
+  }
   byId("decisionSummary").innerHTML = recommendations
-    .map(({ title, sortKey, candidate }) => {
+    .map(({ title, accent, candidate }) => {
       if (!candidate) {
         return "";
       }
       return `
-        <div class="metric recommendation-card${sortKey === "total" ? " accent-card" : ""}">
+        <div class="metric recommendation-card${accent ? " accent-card" : ""}">
           <span>${escapeHtml(title)}</span>
           <strong>${formatEuro(decisionTotalForDisplay(candidate))}<span class="rec-liter-price">(${formatEuro(candidate.fuelInfo.price, 3)}/L)</span></strong>
           <div class="rec-heading">
@@ -2810,10 +2826,24 @@ function renderDecisionResults() {
             candidate.vehicleLiter,
             3
           )}/L</span></td>`;
+      const mapsWaze = `<a class="mini-link" href="${mapsUrl}" target="_blank" rel="noreferrer">Maps</a> <a class="mini-link" href="${wazeUrl}" target="_blank" rel="noreferrer">Waze</a>`;
+      // Détail replié visible uniquement sur mobile (les colonnes secondaires y sont masquées).
+      const mobileExtra = routeMode
+        ? `<div class="row-mobile-extra" hidden>
+            <span>Jauge à l'arrivée : <strong>${formatNumber(candidate.remainingFuelPercent ?? 0, 0)} %</strong></span>
+            <span>Litres du plein : <strong>${formatNumber(liters, 1)} L</strong> (${formatEuro(candidate.fuelInfo.price, 3)}/L)</span>
+            <span class="route-links">${mapsWaze}</span>
+          </div>`
+        : `<div class="row-mobile-extra" hidden>
+            <span>Carburant seul : <strong>${formatEuro(candidate.fillCost)}</strong> (${formatEuro(candidate.fuelInfo.price, 3)}/L)</span>
+            ${showTimeCost ? `<span>Avec temps payé : <strong>${formatEuro(candidate.totalCost)}</strong> (${formatEuro(candidate.effectiveLiter, 3)}/L)</span>` : ""}
+            <span class="route-links">${mapsWaze}</span>
+          </div>`;
       return `
         <tr>
           <td>
             ${stationIdentityHtml(station, `${index + 1}. `)}
+            ${mobileExtra}
           </td>
           ${routeKmCell}
           ${fuelRemainingCell}

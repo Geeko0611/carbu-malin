@@ -5959,3 +5959,61 @@ body.auth-page {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Détail replié d'une ligne (mobile uniquement) : masqué par défaut sur grand écran. */
+.row-mobile-extra {
+  display: none;
+}
+
+/* === Ergonomie mobile (validée 15/06) — moins de colonnes, infos secondaires dépliables === */
+@media (max-width: 640px) {
+  /* A — Décision/Trajet : ne garder que l'essentiel ; le reste passe dans le détail déplié. */
+  .decision-table {
+    min-width: 0;
+  }
+  .decision-table .fill-cost-column,
+  .decision-table .time-cost-column,
+  .decision-table .route-links-column,
+  .decision-table .fuel-remaining-column {
+    display: none !important;
+  }
+  .decision-table th,
+  .decision-table td {
+    padding: 8px 5px;
+    white-space: normal;
+    word-break: break-word;
+  }
+  .row-mobile-extra {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 5px;
+    font-size: 0.78rem;
+    line-height: 1.3;
+  }
+  .row-mobile-extra[hidden] {
+    display: none;
+  }
+  .row-mobile-extra .route-links {
+    margin-top: 2px;
+  }
+
+  /* B — Dashboard : retirer la colonne « Rang » et laisser le nom de station passer à la ligne. */
+  .dashboard-table-panel .data-table {
+    min-width: 0;
+  }
+  .dashboard-table-panel thead th:first-child,
+  #dashboardTable td:first-child {
+    display: none;
+  }
+  .dashboard-table-panel .data-table th,
+  .dashboard-table-panel .data-table td {
+    padding: 7px 5px;
+    white-space: normal;
+    word-break: break-word;
+  }
+  .dashboard-table-panel .data-table th {
+    font-size: 0.8rem;
+    line-height: 1.2;
+  }
+}
