@@ -1,5 +1,9 @@
 const FUELS = ["Gazole", "SP95"];
 const MAX_SEARCH_KM = 50;
+// Mode trajet : rayon de recherche autour de chaque point km (à vol d'oiseau) et marge de sécurité réservoir.
+const ROUTE_AERIAL_RADIUS_KM = 10;
+const TANK_SAFETY_RATIO = 0.1;
+const ROAD_DETOUR_FACTOR = 1.22;
 const MAX_ROUTE_CALLS = 5;
 const ROUTE_CONCURRENCY = 5;
 const ROUTE_TIMEOUT_MS = 4500;
@@ -2200,56 +2204,97 @@ async function runRouteDecision() {
       state.decisionSort = "vehicle";
       showRouteProgress(90, "Stations atteignables");
     } else {
+      // « Le plein le moins cher » sur le trajet.
+      // Marge de sécurité : on garde toujours 10 % du réservoir. Le carburant utilisable
+      // (jauge - 10 %) détermine jusqu'où on analyse les points km du trajet.
+      const tank = clampNumber(vehicle.tankLiters, 5, 140, 40);
+      const safetyLiters = tank * TANK_SAFETY_RATIO;
+      const usableLiters = Math.max(0, initialLiters - safetyLiters);
+      const reachableKm = (usableLiters / consumption) * 100;
+      const totalAutonomyKm = (initialLiters / consumption) * 100;
       const stationBest = new Map();
-      for (const [routeIndex, routeOption] of analyzedRoutes.entries()) {
-        const routePoints = sampleRouteKilometers(routeOption.coordinates, routeOption.distanceKm);
-        for (let index = 0; index < routePoints.length; index += 1) {
-          const point = routePoints[index];
-          const remainingLiters = initialLiters - (point.km * consumption) / 100;
-          const autonomyKm = (remainingLiters / consumption) * 100;
-          if (remainingLiters > 0 && autonomyKm >= 70) {
-            const reachableDetourKm = Math.max(0, autonomyKm - 70);
-            if (reachableDetourKm > 0) {
-              const pointCandidates = stations
-                .map((station) => {
-                  const aerialDistance = haversineKm(point.lat, point.lon, station.lat, station.lon);
-                  const detourKm = aerialDistance * 1.22;
-                  const remainingAtStationLiters = Math.max(0, remainingLiters - (detourKm * consumption) / 100);
-                  const litersToBuy = Math.max(vehicle.tankLiters - remainingAtStationLiters, 0);
-                  return {
-                    station,
-                    fuelInfo: station.fuels[fuel],
-                    routeKm: point.km,
-                    routeTotalKm: routeOption.distanceKm,
-                    routeOptionIndex: routeIndex + 1,
-                    remainingLitersAtRoute: remainingLiters,
-                    litersToBuy,
-                    ...routeFuelEstimate(vehicle, remainingLiters, consumption, routeOption.distanceKm, detourKm),
-                    routePointLat: point.lat,
-                    routePointLon: point.lon,
-                    aerialDistance,
-                    oneWayDistanceKm: detourKm,
-                    oneWayDurationMin: (detourKm / 45) * 60,
-                    roundTripDistanceKm: detourKm * 2,
-                    roundTripDurationMin: (detourKm / 45) * 120,
-                    routeEstimated: true,
-                  };
-                })
-                .filter((candidate) => candidate.litersToBuy > 0.1 && candidate.aerialDistance <= 25 && oneWayDistance(candidate) <= reachableDetourKm)
-                .sort((a, b) => a.fuelInfo.price - b.fuelInfo.price)
-                .slice(0, 20);
 
-              pointCandidates.forEach((candidate) => applyDecisionCosts(candidate, vehicle, candidate.litersToBuy));
-              sortDecisionCandidates(pointCandidates, "vehicle").slice(0, 5).forEach((candidate) => {
-                const previous = stationBest.get(candidate.station.id);
-                if (!previous || candidate.vehicleLiter < previous.vehicleLiter) {
-                  stationBest.set(candidate.station.id, candidate);
-                }
-              });
-            }
+      for (const [routeIndex, routeOption] of analyzedRoutes.entries()) {
+        const allPoints = sampleRouteKilometers(routeOption.coordinates, routeOption.distanceKm);
+        // On ne calcule que sur les points km atteignables avec le carburant utilisable (hors réserve 10 %).
+        const reachablePoints = allPoints.filter((point) => point.km <= reachableKm + 0.001);
+        if (!reachablePoints.length) {
+          continue;
+        }
+        // Pré-filtre géographique : bounding box du tronçon atteignable élargie du rayon de recherche,
+        // pour ne tester que les stations potentiellement à moins de 10 km du trajet (accélère le calcul).
+        const meanLat = reachablePoints[Math.floor(reachablePoints.length / 2)].lat;
+        const latPad = ROUTE_AERIAL_RADIUS_KM / 111;
+        const lonPad = ROUTE_AERIAL_RADIUS_KM / (111 * Math.max(Math.cos(toRad(meanLat)), 0.2));
+        let minLat = Infinity;
+        let maxLat = -Infinity;
+        let minLon = Infinity;
+        let maxLon = -Infinity;
+        reachablePoints.forEach((point) => {
+          minLat = Math.min(minLat, point.lat);
+          maxLat = Math.max(maxLat, point.lat);
+          minLon = Math.min(minLon, point.lon);
+          maxLon = Math.max(maxLon, point.lon);
+        });
+        const nearbyStations = stations.filter(
+          (station) =>
+            station.lat >= minLat - latPad &&
+            station.lat <= maxLat + latPad &&
+            station.lon >= minLon - lonPad &&
+            station.lon <= maxLon + lonPad
+        );
+
+        let processed = 0;
+        for (const station of nearbyStations) {
+          // Point km le plus proche de la station (= plus petit détour) parmi les points atteignables.
+          // Une station peut être proche de plusieurs points km ; on ne garde que le meilleur.
+          const nearest = nearestRoutePointForStation(station, reachablePoints);
+          if (!nearest || nearest.distanceKm > ROUTE_AERIAL_RADIUS_KM) {
+            continue;
           }
-          if (index % 8 === 0) {
-            const routeWeight = (routeIndex + index / Math.max(routePoints.length - 1, 1)) / Math.max(analyzedRoutes.length, 1);
+          const oneWayDetourKm = nearest.distanceKm * ROAD_DETOUR_FACTOR;
+          const arrivalKm = nearest.point.km + oneWayDetourKm;
+          // La voiture doit pouvoir rejoindre physiquement la station : le détour final peut puiser
+          // dans la réserve de 10 % puisque c'est précisément là qu'elle refait le plein.
+          if (arrivalKm > totalAutonomyKm) {
+            continue;
+          }
+          const remainingLitersAtRoute = initialLiters - (nearest.point.km * consumption) / 100;
+          const arrivalLiters = Math.max(0, initialLiters - (arrivalKm * consumption) / 100);
+          const litersToBuy = Math.max(tank - arrivalLiters, 0);
+          if (litersToBuy <= 0.1) {
+            continue;
+          }
+          // Détour net = aller + retour sur l'itinéraire (la distance d'itinéraire évitée est déjà
+          // décomptée car le détour est mesuré depuis le point km, pas depuis le départ).
+          const netDetourKm = oneWayDetourKm * 2;
+          const candidate = {
+            station,
+            fuelInfo: station.fuels[fuel],
+            routeKm: nearest.point.km,
+            routeTotalKm: routeOption.distanceKm,
+            routeOptionIndex: routeIndex + 1,
+            remainingLitersAtRoute,
+            litersToBuy,
+            remainingFuelPercent: clampNumber((arrivalLiters / tank) * 100, 0, 100, 0),
+            safeAutonomyKm: (arrivalLiters / consumption) * 100,
+            routePointLat: nearest.point.lat,
+            routePointLon: nearest.point.lon,
+            aerialDistance: nearest.distanceKm,
+            oneWayDistanceKm: oneWayDetourKm,
+            oneWayDurationMin: (oneWayDetourKm / 45) * 60,
+            roundTripDistanceKm: netDetourKm,
+            roundTripDurationMin: (netDetourKm / 45) * 60,
+            routeEstimated: true,
+          };
+          applyDecisionCosts(candidate, vehicle, litersToBuy);
+          const previous = stationBest.get(station.id);
+          if (!previous || candidate.vehicleLiter < previous.vehicleLiter) {
+            stationBest.set(station.id, candidate);
+          }
+          processed += 1;
+          if (processed % 400 === 0) {
+            const routeWeight = (routeIndex + 0.5) / Math.max(analyzedRoutes.length, 1);
             showRouteProgress(15 + routeWeight * 80, "Analyse des stations");
             await nextFrame();
           }
@@ -2350,7 +2395,11 @@ function buildLateRouteCandidates(routePoints, stations, vehicle, fuel, initialL
 
 async function refineRouteCandidateDistances(candidates, vehicle) {
   const targets = candidates.filter((candidate) => candidate.routeEstimated && candidate.routePointLat && candidate.routePointLon);
+  const tank = clampNumber(vehicle.tankLiters, 5, 140, 40);
+  const consumption = clampNumber(vehicle.consumptionL100, 2, 20, 5.5);
   await processPool(targets.slice(0, 10), ROUTE_CONCURRENCY, async (candidate) => {
+    // Affine le détour estimé (à vol d'oiseau × 1,22) par un vrai calcul d'itinéraire
+    // du point km vers la station, pour les 10 stations retenues.
     const route = await withTimeout(
       routeToStation({ lat: candidate.routePointLat, lon: candidate.routePointLon }, candidate.station),
       ROUTE_TIMEOUT_MS + 400,
@@ -2359,25 +2408,18 @@ async function refineRouteCandidateDistances(candidates, vehicle) {
     if (!route) {
       return;
     }
-    candidate.oneWayDistanceKm = route.distanceKm;
+    const oneWayDetourKm = route.distanceKm;
+    const netDetourKm = oneWayDetourKm * 2;
+    candidate.oneWayDistanceKm = oneWayDetourKm;
     candidate.oneWayDurationMin = route.durationMin;
-    candidate.roundTripDistanceKm = route.distanceKm * 2;
+    candidate.roundTripDistanceKm = netDetourKm;
     candidate.roundTripDurationMin = route.durationMin * 2;
     candidate.routeEstimated = false;
     if (Number.isFinite(candidate.remainingLitersAtRoute)) {
-      const consumption = clampNumber(vehicle.consumptionL100, 2, 20, 5.5);
-      const remainingAtStationLiters = Math.max(0, candidate.remainingLitersAtRoute - (route.distanceKm * consumption) / 100);
-      candidate.litersToBuy = Math.max(clampNumber(vehicle.tankLiters, 5, 140, 40) - remainingAtStationLiters, 0);
-      Object.assign(
-        candidate,
-        routeFuelEstimate(
-          vehicle,
-          candidate.remainingLitersAtRoute,
-          consumption,
-          candidate.routeTotalKm ?? candidate.routeKm ?? 0,
-          route.distanceKm
-        )
-      );
+      const arrivalLiters = Math.max(0, candidate.remainingLitersAtRoute - (oneWayDetourKm * consumption) / 100);
+      candidate.litersToBuy = Math.max(tank - arrivalLiters, 0);
+      candidate.remainingFuelPercent = clampNumber((arrivalLiters / tank) * 100, 0, 100, 0);
+      candidate.safeAutonomyKm = (arrivalLiters / consumption) * 100;
     }
     applyDecisionCosts(candidate, vehicle, candidate.litersToBuy);
   });
@@ -2657,7 +2699,7 @@ function renderDecisionSummary(candidates) {
         <strong>${formatEuro(candidate.vehicleTotalCost)}<span class="rec-liter-price">(${formatEuro(candidate.fuelInfo.price, 3)}/L)</span></strong>
         <div class="rec-heading">
           ${stationIdentityHtml(candidate.station)}
-          <span class="rec-distance">${formatEuro(candidate.vehicleLiter, 3)}/L avec trajet - borne ${formatNumber(candidate.routeKm, 0)} km - détour ${formatNumber(oneWayDistance(candidate), 1)} km</span>
+          <span class="rec-distance">${formatEuro(candidate.vehicleLiter, 3)}/L total - point ${formatNumber(candidate.routeKm, 0)} km - détour net ${formatNumber(candidate.roundTripDistanceKm ?? 0, 1)} km</span>
         </div>
       </div>
     `;
@@ -2708,6 +2750,7 @@ function renderDecisionResults() {
   }
 
   updateDecisionLitersHeaders(state.decisionLitersToBuy || 0);
+  const routeMode = state.analysisMode === "route";
   byId("decisionResults").innerHTML = candidates
     .map((candidate, index) => {
       const station = candidate.station;
@@ -2720,20 +2763,39 @@ function renderDecisionResults() {
             3
           )}/L</span></td>`
         : "";
-      const routeKmCell =
-        state.analysisMode === "route"
-          ? `<td class="route-only-column"><strong>${formatNumber(candidate.routeKm ?? 0, 0)} km</strong><br><span class="muted">/ ${formatNumber(
-              candidate.routeTotalKm ?? candidate.routeKm ?? 0,
-              0
-            )} km</span></td>`
-          : "";
-      const fuelRemainingCell =
-        state.analysisMode === "route"
-          ? `<td class="route-only-column"><strong>${formatNumber(candidate.remainingFuelPercent ?? 0, 0)}%</strong><br><span class="muted">~${formatNumber(
-              candidate.safeAutonomyKm ?? 0,
-              0
-            )} km</span></td>`
-          : "";
+      // Mode trajet : Point km / Jauge à l'arrivée / Détour net / Litres du plein / Prix du plein.
+      const routeKmCell = routeMode
+        ? `<td class="route-only-column"><strong>${formatNumber(candidate.routeKm ?? 0, 0)} km</strong><br><span class="muted">/ ${formatNumber(
+            candidate.routeTotalKm ?? candidate.routeKm ?? 0,
+            0
+          )} km</span></td>`
+        : "";
+      const fuelRemainingCell = routeMode
+        ? `<td class="route-only-column"><strong>${formatNumber(candidate.remainingFuelPercent ?? 0, 0)}%</strong><br><span class="muted">~${formatNumber(
+            candidate.safeAutonomyKm ?? 0,
+            0
+          )} km</span></td>`
+        : "";
+      const distanceCell = routeMode
+        ? `<td class="distance-column"><strong>${formatNumber(candidate.roundTripDistanceKm ?? 0, 1)} km${candidate.routeEstimated ? " *" : ""}</strong><br><span class="muted">aller ${formatNumber(
+            oneWayDistance(candidate),
+            1
+          )} km</span></td>`
+        : `<td class="distance-column"><strong>${formatNumber(oneWayDistance(candidate), 1)} km${candidate.routeEstimated ? " *" : ""}</strong><br><span class="muted">${formatMinutes(
+            oneWayDuration(candidate)
+          )}</span></td>`;
+      const fillCell = routeMode
+        ? `<td class="fill-cost-column"><strong>${formatNumber(liters, 1)} L</strong><br><span class="muted">${formatEuro(candidate.fuelInfo.price, 3)}/L</span></td>`
+        : `<td class="fill-cost-column"><strong>${formatEuro(candidate.fillCost)}</strong><br><span class="muted">${formatNumber(liters, 1)} L - ${formatEuro(candidate.fuelInfo.price, 3)}/L</span></td>`;
+      const vehicleCell = routeMode
+        ? `<td class="vehicle-cost-column"><strong>${formatEuro(candidate.vehicleTotalCost)}</strong><br><span class="muted">${formatEuro(
+            candidate.vehicleLiter,
+            3
+          )}/L total</span></td>`
+        : `<td class="vehicle-cost-column"><strong>${formatEuro(candidate.vehicleTotalCost)}</strong><br><span class="muted">${formatNumber(liters, 1)} L - ${formatEuro(
+            candidate.vehicleLiter,
+            3
+          )}/L</span></td>`;
       return `
         <tr>
           <td>
@@ -2741,14 +2803,9 @@ function renderDecisionResults() {
           </td>
           ${routeKmCell}
           ${fuelRemainingCell}
-          <td class="distance-column"><strong>${formatNumber(oneWayDistance(candidate), 1)} km${candidate.routeEstimated ? " *" : ""}</strong><br><span class="muted">${formatMinutes(
-            oneWayDuration(candidate)
-          )}</span></td>
-          <td class="fill-cost-column"><strong>${formatEuro(candidate.fillCost)}</strong><br><span class="muted">${formatNumber(liters, 1)} L - ${formatEuro(candidate.fuelInfo.price, 3)}/L</span></td>
-          <td class="vehicle-cost-column"><strong>${formatEuro(candidate.vehicleTotalCost)}</strong><br><span class="muted">${formatNumber(liters, 1)} L - ${formatEuro(
-            candidate.vehicleLiter,
-            3
-          )}/L</span></td>
+          ${distanceCell}
+          ${fillCell}
+          ${vehicleCell}
           ${timeCostCell}
           <td class="route-links-column">
             <span class="route-links">
@@ -2775,9 +2832,12 @@ function stationIdentityHtml(station, prefix = "") {
 }
 
 function visibleDecisionColumns() {
-  const mode = state.analysisMode === "route" ? "route" : "local";
+  if (state.analysisMode === "route") {
+    // Mode trajet : colonnes imposées (Litres du plein + Prix du plein), colonne temps masquée.
+    return { fill: true, vehicle: true, time: false };
+  }
   const selected = state.settings.priceView || "vehicle";
-  const preferences = state.settings.columnPreferences?.[mode] || {};
+  const preferences = state.settings.columnPreferences?.local || {};
   const visible = {
     fill: Boolean(preferences.fill),
     vehicle: Boolean(preferences.vehicle),
@@ -2898,8 +2958,8 @@ function renderDecisionMap(candidates, context = {}) {
       .bindPopup(`
         <strong>${renderStationNameHtml(station)}</strong><br>
         ${escapeHtml(stationFullAddress(station))}<br>
-        ${candidate.routeKm !== undefined ? `Borne ${formatNumber(candidate.routeKm, 0)} km<br>` : ""}
-        ${formatEuro(candidate.vehicleTotalCost)} - ${formatEuro(candidate.vehicleLiter, 3)}/L
+        ${candidate.routeKm !== undefined ? `Point ${formatNumber(candidate.routeKm, 0)} km - détour net ${formatNumber(candidate.roundTripDistanceKm ?? 0, 1)} km<br>` : ""}
+        Plein : ${formatEuro(candidate.vehicleTotalCost)} (${formatEuro(candidate.vehicleLiter, 3)}/L) - ${formatNumber(candidate.litersToBuy ?? 0, 1)} L${candidate.remainingFuelPercent !== undefined ? `<br>Jauge à l'arrivée : ${formatNumber(candidate.remainingFuelPercent, 0)} %` : ""}
       `)
       .addTo(map);
     });
@@ -2985,25 +3045,27 @@ function syncDecisionTimeColumn() {
   document.querySelectorAll(".route-only-column").forEach((node) => {
     node.hidden = state.analysisMode !== "route";
   });
+  const routeMode = state.analysisMode === "route";
   const distanceHeader = byId("distanceSortHeader");
   if (distanceHeader) {
-    distanceHeader.textContent = state.analysisMode === "route" ? "Détour (km)" : "Distance (km)";
+    distanceHeader.textContent = routeMode ? "Détour net (km)" : "Distance (km)";
   }
-  setText("vehicleCostHeaderSuffix", state.analysisMode === "route" ? "+ coût détour" : "+ coût trajet");
-  setText("timeCostHeaderSuffix", state.analysisMode === "route" ? "+ coût détour + temps payé" : "+ coût trajet + temps payé");
+  setText("fuelRemainingHeaderLabel", "Jauge à l'arrivée");
+  setText("fillCostHeaderLabel", routeMode ? "Litres du plein" : "Prix carburant");
+  setText("vehicleCostHeaderLabel", routeMode ? "Prix du plein" : "Prix carburant");
+  setText("vehicleCostHeaderSuffix", routeMode ? "carburant + coût détour net" : "+ coût trajet");
+  setText("timeCostHeaderSuffix", routeMode ? "+ coût détour + temps payé" : "+ coût trajet + temps payé");
   const distanceInfo = byId("distanceInfoDot");
   if (distanceInfo) {
-    distanceInfo.dataset.tooltip =
-      state.analysisMode === "route"
-        ? "Détour à faire sur le trajet pour accéder à la station."
-        : "Distance entre le départ et la station, avec temps de trajet estimé.";
+    distanceInfo.dataset.tooltip = routeMode
+      ? "Détour net (aller-retour) à faire depuis l'itinéraire pour accéder à la station et le rejoindre."
+      : "Distance entre le départ et la station, avec temps de trajet estimé.";
   }
   const vehicleInfo = byId("vehicleCostInfoDot");
   if (vehicleInfo) {
-    vehicleInfo.dataset.tooltip =
-      state.analysisMode === "route"
-        ? "Ajoute le carburant utilisé pour faire le détour jusqu'à la station."
-        : "Ajoute le carburant utilisé pour arriver à la station et revenir au départ.";
+    vehicleInfo.dataset.tooltip = routeMode
+      ? "Prix du plein = carburant acheté + coût du détour net (carburant et usure)."
+      : "Ajoute le carburant utilisé pour arriver à la station et revenir au départ.";
   }
 }
 
@@ -3096,6 +3158,16 @@ function stationCommercialName(station) {
   return station.name || `Station ${city || station.cp || station.id}`;
 }
 
+// Recherche une enseigne comme mot entier (et non sous-chaîne) dans un texte normalisé.
+// Évite les faux positifs : « Bretenière » ne doit pas être détecté comme « ENI ».
+function brandAliasMatches(normalizedText, alias) {
+  const normalizedAlias = normalizeSearchText(alias);
+  if (!normalizedAlias) {
+    return false;
+  }
+  return new RegExp(`(^| )${normalizedAlias}( |$)`).test(normalizedText);
+}
+
 function commercialStationBrand(station) {
   const raw = String(station.brand || station.name || "").trim();
   const normalized = normalizeSearchText(raw);
@@ -3117,7 +3189,7 @@ function commercialStationBrand(station) {
     ["Esso", ["Esso"]],
     ["ENI", ["ENI", "Agip"]],
   ];
-  const found = commercialBrands.find(([, aliases]) => aliases.some((alias) => normalized.includes(normalizeSearchText(alias))));
+  const found = commercialBrands.find(([, aliases]) => aliases.some((alias) => brandAliasMatches(normalized, alias)));
   if (found) {
     return found[0];
   }
@@ -3154,7 +3226,7 @@ function cleanStationBrand(value, city = "") {
     ["Casino", ["casino", "geant casino"]],
     ["Cora", ["cora"]],
   ];
-  const found = brands.find(([, aliases]) => aliases.some((alias) => normalized.includes(normalizeSearchText(alias))));
+  const found = brands.find(([, aliases]) => aliases.some((alias) => brandAliasMatches(normalized, alias)));
   if (found) {
     return found[0];
   }
@@ -4459,7 +4531,7 @@ function aggregateBrands(metrics, eligible) {
 function brandGroupName(station) {
   const brand = commercialStationBrand(station);
   const normalized = normalizeSearchText(brand);
-  const has = (...aliases) => aliases.some((alias) => normalized.includes(normalizeSearchText(alias)));
+  const has = (...aliases) => aliases.some((alias) => brandAliasMatches(normalized, alias));
   if (!brand || has("indépendante", "station indépendante") || normalized.startsWith("STATION")) return "Station indépendante";
   if (has("Système U", "Super U", "Hyper U", "U Express", "Coopérative U")) return "Coopérative U";
   if (has("Leclerc", "E.Leclerc")) return "E.Leclerc";
