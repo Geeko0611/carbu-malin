@@ -5,3 +5,5 @@ dist/
 .env.local
 update_and_deploy.log
 .trash/
+# Fichier source volumineux (input local, regenere via --source instant) — >100 Mo, jamais committe
+docs/Fichiers Stations.txt
