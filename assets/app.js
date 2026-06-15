@@ -506,6 +506,8 @@ function bindEvents() {
   byId("favoriteAddressInput")?.addEventListener("focus", updateFavoriteAddressSuggestions);
 
   byId("locateButton").addEventListener("click", locateUser);
+  byId("mobileParamsRecap")?.addEventListener("click", exitResultsMode);
+  setupMobileFilterToggles();
   document.querySelectorAll("[data-decision-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       state.decisionMode = button.dataset.decisionMode || "total";
@@ -1603,6 +1605,52 @@ function setAnalysisMode(mode) {
   });
   state.decisionMode = state.analysisMode === "route" ? "total" : state.decisionMode === "routeLate" ? "total" : state.decisionMode;
   state.decisionSort = decisionSortForMode(state.decisionMode);
+  exitResultsMode();
+}
+
+// Mobile : après un calcul, on replie le formulaire pour faire remonter la réponse (résultats)
+// sur le premier écran. Un récap cliquable rouvre le formulaire.
+function enterResultsMode() {
+  const recap = byId("mobileParamsRecap");
+  if (recap) {
+    const origin = state.origin?.label || byId("cityInput").value.trim() || "Départ";
+    const vehicle = selectedVehicle();
+    const gauge = Math.round(clampNumber(byId("gaugeInput").value, 0, 100, 30));
+    const destText = byId("destinationInput")?.value.trim();
+    const dest = state.analysisMode === "route" && destText ? ` → ${destText}` : "";
+    recap.textContent = `📍 ${origin}${dest} · ${vehicleDisplayName(vehicle)} · ${gauge}% · ✎ Modifier`;
+    recap.hidden = false;
+  }
+  document.body.classList.add("decision-results");
+}
+
+function exitResultsMode() {
+  document.body.classList.remove("decision-results");
+  const recap = byId("mobileParamsRecap");
+  if (recap) {
+    recap.hidden = true;
+  }
+}
+
+// Mobile : replie les panneaux de filtres (Classements / Enseignes) derrière un bouton « Filtres »
+// pour que les données remontent sur le premier écran. Sans effet sur desktop (CSS ≤640px).
+function setupMobileFilterToggles() {
+  document.querySelectorAll(".dashboard-filter-panel").forEach((panel) => {
+    if (panel.querySelector(":scope > .filter-toggle")) {
+      return;
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "filter-toggle";
+    button.textContent = "Filtres";
+    button.setAttribute("aria-expanded", "false");
+    button.addEventListener("click", () => {
+      const open = panel.classList.toggle("filters-open");
+      button.setAttribute("aria-expanded", String(open));
+      button.textContent = open ? "Masquer les filtres" : "Filtres";
+    });
+    panel.prepend(button);
+  });
 }
 
 function scheduleStartupDecision() {
@@ -2154,6 +2202,7 @@ async function runDecision() {
     renderDecisionResults();
     renderDecisionMap(state.decisionCandidates, { origin });
     setText("decisionStatus", `${candidates.length} stations analysées`);
+    enterResultsMode();
   } catch (error) {
     byId("decisionResults").innerHTML = `<tr><td colspan="${decisionColumnCount()}" class="empty-cell">${escapeHtml(
       error.message || "Calcul impossible."
@@ -2341,6 +2390,7 @@ async function runRouteDecision() {
     });
     showRouteProgress(100, "Résultat prêt");
     setText("decisionStatus", `${candidates.length} stations affichées sur le trajet`);
+    enterResultsMode();
   } catch (error) {
     byId("decisionResults").innerHTML = `<tr><td colspan="${decisionColumnCount()}" class="empty-cell">${escapeHtml(
       error.message || "Calcul impossible."
