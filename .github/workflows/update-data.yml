@@ -1,51 +1,38 @@
-name: Mise à jour données carburant + déploiement FTP
+name: Déploiement code sur le FTP
+
+# Les DONNÉES (data/) ne sont plus gérées ici : elles sont régénérées chaque
+# jour par un cron sur le serveur Hostinger (scripts/run_build.sh, 4h00).
+# Ce workflow déploie UNIQUEMENT le code et ne touche jamais à /data,
+# afin de ne pas écraser les données fraîches produites par le cron.
 
 on:
   workflow_dispatch:          # déclenchement manuel possible
-  schedule:
-    - cron: "35 5 * * *"     # tous les jours à 5h35 UTC (7h35 heure française)
   push:
-    branches: [main]          # full deploy automatique à chaque merge sur main
+    branches: [main]          # déploiement du code à chaque merge sur main
 
 jobs:
-  update-and-deploy:
+  deploy-code:
     runs-on: ubuntu-latest
 
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Installer Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Installer les dépendances Python
-        run: pip install requests
-
-      - name: Générer les données carburant
-        run: |
-          python scripts/build_data.py \
-            --source instant \
-            --output data \
-            --history-start-year 2025
-
-      - name: Préparer le paquet de déploiement
+      - name: Préparer le paquet de déploiement (code uniquement, sans data/)
         run: |
           rm -rf dist && mkdir -p dist
           cp index.html robots.txt site.webmanifest sitemap.xml dist/
           cp -R assets dist/
-          cp -R data dist/
 
-      - name: Déployer sur le FTP
+      - name: Déployer sur le FTP (avec retries)
         env:
           FTP_HOST: ${{ secrets.FTP_SERVER }}
           FTP_USER: ${{ secrets.FTP_USERNAME }}
           FTP_PASS: ${{ secrets.FTP_PASSWORD }}
           FTP_DIR: ${{ secrets.FTP_SERVER_DIR }}
         run: |
-          python - <<'EOF'
-          import ftplib, os
+          python3 - <<'EOF'
+          import ftplib, os, time
           from pathlib import Path
 
           host = os.environ["FTP_HOST"]
@@ -54,7 +41,12 @@ jobs:
           remote_root = os.environ["FTP_DIR"].rstrip("/")
           local_root = Path("dist")
 
-          MAX_SIZE = 15 * 1024 * 1024
+          def connect():
+              ftp = ftplib.FTP()
+              ftp.connect(host, 21, timeout=60)
+              ftp.login(user, passwd)
+              ftp.set_pasv(True)
+              return ftp
 
           def ftp_mkdirs(ftp, remote_path):
               parts = remote_path.strip("/").split("/")
@@ -66,28 +58,37 @@ jobs:
                   except ftplib.error_perm:
                       pass
 
-          def upload_dir(ftp, local_dir, remote_dir):
+          ftp = connect()
+          print("Connecté.")
+
+          def upload_file(item, remote_path, attempts=3):
+              global ftp
+              for attempt in range(1, attempts + 1):
+                  try:
+                      with open(item, "rb") as f:
+                          ftp.storbinary(f"STOR {remote_path}", f)
+                      print(f"  OK   {remote_path} ({item.stat().st_size//1024}KB)")
+                      return
+                  except ftplib.all_errors as exc:
+                      print(f"  RETRY {remote_path} ({attempt}/{attempts}): {exc}")
+                      time.sleep(3)
+                      try:
+                          ftp = connect()   # reconnexion après échec réseau
+                      except ftplib.all_errors:
+                          pass
+              raise RuntimeError(f"Échec upload {remote_path}")
+
+          def upload_dir(local_dir, remote_dir):
               ftp_mkdirs(ftp, remote_dir)
               for item in sorted(local_dir.iterdir()):
                   remote_path = f"{remote_dir}/{item.name}"
                   if item.is_dir():
-                      upload_dir(ftp, item, remote_path)
+                      upload_dir(item, remote_path)
                   elif item.is_file():
-                      size = item.stat().st_size
-                      if size > MAX_SIZE:
-                          print(f"  SKIP {remote_path} ({size//1024//1024}MB)")
-                          continue
-                      with open(item, "rb") as f:
-                          ftp.storbinary(f"STOR {remote_path}", f)
-                      print(f"  OK   {remote_path} ({size//1024}KB)")
+                      upload_file(item, remote_path)
 
           print(f"Connexion à {host}...")
-          ftp = ftplib.FTP()
-          ftp.connect(host, 21, timeout=60)
-          ftp.login(user, passwd)
-          ftp.set_pasv(True)
-          print("Connecté.")
-          upload_dir(ftp, local_root, remote_root)
+          upload_dir(local_root, remote_root)
           ftp.quit()
-          print("Déploiement terminé.")
+          print("Déploiement code terminé.")
           EOF
