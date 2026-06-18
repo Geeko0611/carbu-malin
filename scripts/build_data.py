@@ -15,7 +15,7 @@ import unicodedata
 import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 from urllib.parse import urlencode
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -794,7 +794,7 @@ def snapshot_price_groups(
     start_date: str,
     end_date: str,
     allowed_station_ids: set[str] | None = None,
-) -> list[tuple[str, list[tuple[str, float]], int, int]]:
+) -> Iterator[tuple[str, list[tuple[str, float]], int, int]]:
     current: dict[str, dict[str, float]] = {}
     source_fuels = {
         source_fuel
@@ -857,7 +857,6 @@ def snapshot_price_groups(
                 rupture_ends.setdefault(end_key, set()).add((station_id, source_fuel))
 
     active_ruptures: set[tuple[str, str]] = set()
-    snapshots: list[tuple[str, list[tuple[str, float]], int, int]] = []
 
     for day in iter_iso_dates(start_date, end_date):
         active_ruptures.difference_update(rupture_ends.get(day, set()))
@@ -888,9 +887,7 @@ def snapshot_price_groups(
 
         values.sort(key=lambda item: (item[1], item[0]))
         if values:
-            snapshots.append((day, values, len(rupture_station_ids), len(values) + len(rupture_station_ids)))
-
-    return snapshots
+            yield (day, values, len(rupture_station_ids), len(values) + len(rupture_station_ids))
 
 
 def aggregate_history(
@@ -1069,26 +1066,19 @@ def write_daily_score_files(
     ]
 
     for fuel in FUELS:
-        if start_date and end_date:
-            snapshots = snapshot_price_groups(conn, fuel, start_date, end_date, set(station_index))
-            dates = [date for date, _values, _rupture_count, _total_stations in snapshots]
-        else:
-            date_rows = conn.execute(
-                "SELECT DISTINCT date FROM daily_prices WHERE fuel = ? ORDER BY date",
-                (fuel,),
-            ).fetchall()
-            dates = [row[0] for row in date_rows]
-            snapshots = []
-        date_index = {date: index for index, date in enumerate(dates)}
-        chunk_years = sorted({date[:4] for date in dates})
-        chunk_files = {year: f"daily_scores_{fuel.lower()}_{year}.json" for year in chunk_years}
+        # dates / date_index sont construits au fil de l'eau (streaming) pour ne
+        # jamais charger toute l'annee de snapshots en memoire (limite RAM mutualise).
+        dates: list[str] = []
+        date_index: dict[str, int] = {}
         handles: dict[str, Any] = {}
         first_rows: dict[str, bool] = {}
 
         def chunk_handle(year: str) -> Any:
             handle = handles.get(year)
             if handle is None:
-                handle = (output_dir / chunk_files[year]).open("w", encoding="utf-8")
+                handle = (output_dir / f"daily_scores_{fuel.lower()}_{year}.json").open(
+                    "w", encoding="utf-8"
+                )
                 handle.write('{"fuel":')
                 handle.write(json.dumps(fuel, ensure_ascii=False))
                 handle.write(',"year":')
@@ -1109,6 +1099,9 @@ def write_daily_score_files(
         def flush_group(date: str | None, values: list[tuple[str, float]]) -> None:
             if date is None or not values:
                 return
+            if date not in date_index:
+                date_index[date] = len(dates)
+                dates.append(date)
             denominator = max(len(values) - 1, 1)
             last_price: float | None = None
             last_score = 0
@@ -1126,8 +1119,10 @@ def write_daily_score_files(
                 ]
                 write_chunk_row(date, row)
 
-        if snapshots:
-            for date, group, _rupture_count, _total_stations in snapshots:
+        if start_date and end_date:
+            for date, group, _rupture_count, _total_stations in snapshot_price_groups(
+                conn, fuel, start_date, end_date, set(station_index)
+            ):
                 flush_group(date, group)
         else:
             current_date: str | None = None
@@ -1154,13 +1149,14 @@ def write_daily_score_files(
             handle.write("]}")
             handle.close()
 
+        chunk_years = sorted(handles.keys())
         manifest = {
             "metadata": metadata,
             "fuel": fuel,
             "dates": dates,
             "stations": compact_stations,
             "chunks": [
-                {"year": year, "file": chunk_files[year]}
+                {"year": year, "file": f"daily_scores_{fuel.lower()}_{year}.json"}
                 for year in chunk_years
             ],
         }
